@@ -1,0 +1,6 @@
+This folder contains files that are not part the project but on which it
+depends.
+
+ - indent/vhdl.vim : Revised VHDL indent file
+   http://www.vim.org/scripts/script.php?script_id=1450
+
