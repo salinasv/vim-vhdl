@@ -295,3 +295,56 @@ endfun
 " menu : word, abbr, menu, info, kind, icase, dup
 " tags : name, filename, cmd, kind, static
 
+"""""""""""""""""""""""""""""""""""""""
+" Load template from ~/.template/vhdl
+"""""""""""""""""""""""""""""""""""""""
+"name for the template, the function Template_Replace_Special()
+"replace $template:filename$ by the filname (for exemple)
+let s:template_var = {
+     \ 'template:filename': 'expand("%:t")',
+     \ 'template:name': 'expand("%:t:r")',
+     \}
+"Because not all systems support strftime
+if exists("*strftime")
+let s:template_var["template:date"] = 'strftime("%d\/%m\/%Y")'
+:endif
+
+"replacement function, use s:template_var
+fun! Template_Replace_Special()
+ for [k,v] in items(s:template_var)
+   exe '%s/\$'.k.'\$/\='.v.'/g'
+ endfor
+endfun
+
+if  !filereadable(expand("%")) 
+	"Template loading
+	0r ~/.templates/vhdl
+	"Filling template replace $template:date$ and $template:filename$
+
+	call Template_Replace_Special()
+endif
+
+""""""""""""""""""""""""""""""""""""""
+" Some cool shortcuts
+""""""""""""""""""""""""""""""""""""""
+
+" shortcuts
+imap <buffer> ,, <= 
+imap <buffer> .. => 
+
+" abbreviations
+iabbr dt downto
+iabbr sig signal
+iabbr gen generate
+iabbr ot others
+iabbr sl std_logic
+iabbr slv std_logic_vector
+iabbr uns unsigned
+iabbr toi to_integer
+iabbr tos to_unsigned
+iabbr tou to_unsigned
+imap <buffer> I: I : in 
+imap <buffer> O: O : out 
+
+" Functions
+map <F2> :call VHDL_nice_align()<CR> 
