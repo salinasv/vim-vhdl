@@ -3,4 +3,6 @@ depends.
 
  - indent/vhdl.vim : Revised VHDL indent file
    http://www.vim.org/scripts/script.php?script_id=1450
+   Part of the default Vim runtime (v1.50, 2007-01-29)
+   Current version: 1.54 (2007-08-17)
 

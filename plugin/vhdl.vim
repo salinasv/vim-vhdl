@@ -9,18 +9,18 @@ let g:vhdl_plugin=1
 " Cursor is moved at the end of the given range
 fun! VHDL_align(delim) range
 
-  let l = getline(a:firstline,a:lastline)
-  call map(l, 'substitute(v:val, "\\(--.*\\)\\<!@\\s*".a:delim."\\s*", " ".a:delim." ", "")')
-  let pos = map(copy(l), 'stridx(v:val, a:delim)')
+  call map(range(a:firstline,a:lastline), 'setline(v:val, substitute(getline(v:val), "\\(--.*\\)\\@<!\\s*".a:delim."\\s*", " ".a:delim." ", ""))')
+  let pos = map(range(a:firstline,a:lastline), 'virtcol([v:val,stridx(getline(v:val),a:delim)+1])')
   let pos_max = max(pos)
 
-  let i = 0
-  while i < len(l)
-    let l[i] = substitute(l[i], '\ze'.a:delim, repeat(' ',pos_max-pos[i]), '')
+  let i = a:firstline
+  while i <= a:lastline
+    if pos[i-a:firstline] > 0
+      call setline(i, substitute(getline(i), '\ze'.a:delim, repeat(' ',pos_max-pos[i-a:firstline]), ''))
+    endif
     let i+=1
   endwhile
 
-  call setline(a:firstline, l)
   call cursor(a:lastline,0)
 
 endfun
