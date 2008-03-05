@@ -114,14 +114,14 @@ endfun
 
 " Get port/generic of a given entity or component
 " a:kind is a kind of tag : e, c, g (generic in entity)
-" Return [] if nothing is found
+" Return -1 if no tag is not found
 fun! VHDL_portgeneric_get(name, kind)
 
   let type = a:kind == 'g' ? 'generic' : 'port'
   let kind = a:kind == 'g' ? 'e' : a:kind
   
   let l = filter(taglist('^'.a:name), 'v:val.kind==kind')
-  if empty(l) | return [] | endif
+  if empty(l) | return -1 | endif
   let t = l[0]
 
   let view_bak = winsaveview()
@@ -177,8 +177,13 @@ fun! VHDL_comp_ports_put()
 
   let ports = VHDL_portgeneric_get(name, 'e')
   call setpos('.', cursor_bak)
+  if type(ports) != 3:
+    "echomsg "Entity tag '".name."' not found."
+    return
+  elseif empty(ports)
+    return
+  endif
 
-  if empty(ports) | return | endif
   norm a (
   silent! pu=ports
   exe '.-'.(len(ports)-1).',.call VHDL_nice_align()'
@@ -202,7 +207,6 @@ fun! VHDL_map_put()
   endif
 
   let name = matchstr(getline('.'), ':\s*\zs\k\+')
-
   if name == '' 
     call setpos('.', cursor_bak)
     return
@@ -211,15 +215,14 @@ fun! VHDL_map_put()
   call setpos('.', cursor_bak)
 
   " Remove the "map"
-  norm Xxx
+  norm 2"_X"_x
 
   " Generic
   if do_generic
 
     let lines = VHDL_portgeneric_get(name, 'g')
     call setpos('.', cursor_bak)
-
-    if !empty(lines)
+    if type(lines) == 3 && !empty(lines)
 
       exe "norm ageneric ma\<Esc>ap ("
 
@@ -233,7 +236,6 @@ fun! VHDL_map_put()
       let cursor_bak2 = getpos('.')
 
       exe '.-'.(len(lines)).',.call VHDL_nice_align()'
-
       let end_move = 1
 
     endif
@@ -251,15 +253,28 @@ fun! VHDL_map_put()
     exe "norm apor\<Esc>at "
   endif
 
-  if empty(lines)
+  if type(lines) != 3
+    "echomsg "Entity tag '".name."' not found."
+    if exists('end_move')
+      exe "norm ama\<Esc>ap ();"
+    else
+      exe "norm ama\<Esc>ap ("
+    endif
+
+  elseif empty(lines)
     exe "norm ama\<Esc>ap ();"
+    " Move cursor in brackets, if nothing has been added
+    if !exists('end_move')
+      call cursor('.',col('.')-2)
+    endif
+
   else
     exe "norm ama\<Esc>ap ("
 
     call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
     call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
     if lines[-1] !~ '--'
-      let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ')', '') "XXX
+      let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ');', '') "XXX
     endif
     silent! pu=lines
     exe '.-'.(len(lines)).',.call VHDL_nice_align()'
@@ -279,13 +294,31 @@ fun! VHDL_map_put()
 endfun
 
 
-
 "XXX
 fun! VHDL_init()
 
   setlocal ignorecase
   setlocal omnifunc=VHDL_omnicomp
 
+
+  " Simple shortcuts
+  "XXX use abbrev too ?
+  imap <buffer> ,, <= 
+  imap <buffer> .. => 
+  iabbrev <buffer> dt downto
+  iabbrev <buffer> sig signal
+  iabbrev <buffer> gen generate
+  iabbrev <buffer> ot others
+  iabbrev <buffer> sl std_logic
+  iabbrev <buffer> slv std_logic_vector
+  iabbrev <buffer> uns unsigned
+  iabbrev <buffer> toi to_integer
+  iabbrev <buffer> tos to_unsigned
+  iabbrev <buffer> tou to_unsigned
+  iabbrev <buffer> I: I : in 
+  iabbrev <buffer> O: O : out 
+
+  " port/map auto-fill
   inoreabbrev <buffer> <silent> port port<C-o>:call VHDL_comp_ports_put()<CR>
   inoreabbrev <buffer> <silent> map map<C-o>:call VHDL_map_put()<CR>
 
@@ -295,56 +328,3 @@ endfun
 " menu : word, abbr, menu, info, kind, icase, dup
 " tags : name, filename, cmd, kind, static
 
-"""""""""""""""""""""""""""""""""""""""
-" Load template from ~/.template/vhdl
-"""""""""""""""""""""""""""""""""""""""
-"name for the template, the function Template_Replace_Special()
-"replace $template:filename$ by the filname (for exemple)
-let s:template_var = {
-     \ 'template:filename': 'expand("%:t")',
-     \ 'template:name': 'expand("%:t:r")',
-     \}
-"Because not all systems support strftime
-if exists("*strftime")
-let s:template_var["template:date"] = 'strftime("%d\/%m\/%Y")'
-:endif
-
-"replacement function, use s:template_var
-fun! Template_Replace_Special()
- for [k,v] in items(s:template_var)
-   exe '%s/\$'.k.'\$/\='.v.'/g'
- endfor
-endfun
-
-if  !filereadable(expand("%")) 
-	"Template loading
-	0r ~/.templates/vhdl
-	"Filling template replace $template:date$ and $template:filename$
-
-	call Template_Replace_Special()
-endif
-
-""""""""""""""""""""""""""""""""""""""
-" Some cool shortcuts
-""""""""""""""""""""""""""""""""""""""
-
-" shortcuts
-imap <buffer> ,, <= 
-imap <buffer> .. => 
-
-" abbreviations
-iabbr dt downto
-iabbr sig signal
-iabbr gen generate
-iabbr ot others
-iabbr sl std_logic
-iabbr slv std_logic_vector
-iabbr uns unsigned
-iabbr toi to_integer
-iabbr tos to_unsigned
-iabbr tou to_unsigned
-imap <buffer> I: I : in 
-imap <buffer> O: O : out 
-
-" Functions
-map <F2> :call VHDL_nice_align()<CR> 
