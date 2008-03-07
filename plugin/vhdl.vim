@@ -1,3 +1,24 @@
+" Vim plugin for VHDL language
+"
+" Author: Benoît Ryder (benoit@ryder.fr)
+"
+" Usage:
+"  - call VHDL_init() to init stuff
+"  - some features need tags, keep them up to date
+"
+" Features:
+"  - omni-completion of entities names after 'component' keyword
+"  - put entity ports into component declaration
+"    to add ports, type:
+"       component compname port
+"  - put entity generic port map and/or component port map
+"    to add only ports type:
+"       labelname : compname port map
+"    to add both generic (if any) and port maps type:
+"       labelname : compname map
+"  - reindent and do some realignments
+"       sample use:  %call VHDL_nice_align()
+
 
 if exists('g:vhdl_plugin')
   finish

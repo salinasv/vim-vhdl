@@ -1,20 +1,29 @@
-""" Very Simple Templates
+" Very Simple Templates plugin
 "
-" Read a template file and replace tags in it.
-" Templates tag can be specified in the following dictionaries:
-"  - s:default_tags
-"  - g:vstpl_tags
-"  - b:vstpl_tags
+" Description: Read a template file and replace tags in it.
+" Author: Benoît Ryder (benoit@ryder.fr)
 "
-" Keys are tag names, values are replacement expressions.
-" 
+" Usage:
+"   Template tags are sought in the following (dictionary) variables:
+"    - s:default_tags
+"    - g:vstpl_tags
+"    - b:vstpl_tags
+"
+"   Keys are tag names, values are replacement expressions.
+"
 " Example:
-"   let g:vstpl_tags = { 'tpl:file': 'expand("%")' }
-"   will replace $tpl:file$ with current filename.
+"   let g:vstpl_tags = { 'tpl:filename': 'expand("%:t")' }
+"   will replace $tpl:file$ with buffer basename.
 "
-" g:default_tags is filled width default values, set
-" g:vstpl_default to 0 if you don't want to use them.
-" if not defined previously (e.g. in .vimrc).
+" Configuration:
+"  - g:vstpl_default = 0
+"      do not use g:default_tags tags
+"
+" Functions:
+"  - VSTpl_replace() : replace tags in current buffer.
+"  - VSTpl_ifnew(ftpl) : load template ftpl if current buffer is a non
+"      new file (not readable) and replace tags.
+"   
 "
 " TODO how to include in ftplugin
 " TODO change/complete default tags
@@ -35,18 +44,18 @@ set cpo&vim
 
 " Default template tags
 let s:default_tags = {
-      \ 'template:filename': 'expand("%:t")',
-      \ 'template:name': 'expand("%:t:r")',
+      \ 'tpl:filename': 'expand("%:t")',
+      \ 'tpl:name':     'expand("%:t:r")',
       \}
 
 "Because not all systems support strftime
 if exists("*strftime")
-  let s:template_var["template:date"] = 'strftime("%d\/%m\/%Y")'
+  let s:default_tags["template:date"] = 'strftime("%d\/%m\/%Y")'
 endif
 
 
 " Replace template tags found
-fun! Templates_Replace()
+fun! VSTpl_replace()
   tags = {}
   if !exists(g:vstpl_tags) || g:vstpl_tags!=0
     call extend(tags, s:default_tags)
@@ -66,10 +75,10 @@ endfun
 
 
 " Use a given template if current file is not readable (new file)
-fun! Template_ifnew(ftpl)
+fun! VSTpl_ifnew(ftpl)
   if filereadable(expand("%")) | return | endif
   exe "0r ".a:ftpl
-  call Template_Replace_Special()
+  call VSTpl_replace()
 endif
 
 

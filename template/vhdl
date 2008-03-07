@@ -2,8 +2,8 @@
 -- Company     : Vim Inc
 -- Author(s)   : Name Surname
 -- 
--- Creation Date : $template:date$
--- File          : $template:filename$
+-- Creation Date : $tpl:date$
+-- File          : $tpl:filename$
 --
 -- Abstract : 
 --
@@ -14,7 +14,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.all;
 
 ---------------------------------------------------------------------------
-Entity $template:name$ is 
+Entity $tpl:name$ is 
 ---------------------------------------------------------------------------
 port 
 (
@@ -23,9 +23,9 @@ end entity;
 
 
 ---------------------------------------------------------------------------
-Architecture $template:name$_1 of $template:name$ is
+Architecture $tpl:name$_1 of $tpl:name$ is
 ---------------------------------------------------------------------------
 
 begin
 	
-end architecture $template:name$_1;
+end architecture $tpl:name$_1;
