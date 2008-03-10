@@ -198,7 +198,7 @@ fun! VHDL_comp_ports_put()
 
   let ports = VHDL_portgeneric_get(name, 'e')
   call setpos('.', cursor_bak)
-  if type(ports) != 3:
+  if type(ports) != 3
     "echomsg "Entity tag '".name."' not found."
     return
   elseif empty(ports)
@@ -331,7 +331,7 @@ fun! VHDL_init()
   iabbrev <buffer> gen generate
   iabbrev <buffer> ot others
   iabbrev <buffer> sl std_logic
-  iabbrev <buffer> slv std_logic_vector
+  iabbrev <buffer> slv std_logic_vector(
   iabbrev <buffer> uns unsigned
   iabbrev <buffer> toi to_integer
   iabbrev <buffer> tos to_unsigned
@@ -342,6 +342,10 @@ fun! VHDL_init()
   " port/map auto-fill
   inoreabbrev <buffer> <silent> port port<C-o>:call VHDL_comp_ports_put()<CR>
   inoreabbrev <buffer> <silent> map map<C-o>:call VHDL_map_put()<CR>
+
+	map <F2> :call VHDL_nice_align()<CR>
+	map <F11> :cp<CR>
+	map <F12> :cn<CR>
 
 endfun
 
