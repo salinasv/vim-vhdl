@@ -87,7 +87,7 @@ fun! VSTpl_load(ftpl)
 endfun
 
 
-au BufNewFile *.{vhd,vhdl} VSTpl_load(g:vstpl_default_template)
+au BufNewFile *.{vhd,vhdl} call VSTpl_load(g:vstpl_default_template)
 
 
 let &cpo = s:save_cpo
