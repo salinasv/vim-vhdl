@@ -54,8 +54,8 @@ let s:default_tags = {
       \}
 
 "Because not all systems support strftime
-if exists('"*strftime"')
-  let s:default_tags["template:date"] = 'strftime("%d\/%m\/%Y")'
+if exists('*strftime')
+  let s:default_tags['tpl:date'] = 'strftime("%d\/%m\/%Y")'
 endif
 
 
