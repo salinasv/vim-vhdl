@@ -8,9 +8,9 @@
 "
 " Features:
 "  - omni-completion of entities names after 'component' keyword
-"  - put entity ports into component declaration
-"    to add ports, type:
-"       component compname port
+"  - easy component creation (insert entity ports)
+"    after typing 'component', throws a name prompt (entities names
+"    completion), then build basic component code
 "  - put entity generic port map and/or component port map
 "    to add only ports type:
 "       labelname : compname port map
@@ -52,7 +52,7 @@ fun! VHDL_nice_align() range
 
   " Reindent
   let equalprg_bak = &l:equalprg
-  exe 'norm '.(a:lastline-a:firstline+1).'=='
+  silent exe 'norm '.(a:lastline-a:firstline+1).'=='
   let &l:equalprg = equalprg_bak
 
   " Signal declarations, :
@@ -141,7 +141,7 @@ fun! VHDL_portgeneric_get(name, kind)
   let type = a:kind == 'g' ? 'generic' : 'port'
   let kind = a:kind == 'g' ? 'e' : a:kind
   
-  let l = filter(taglist('^'.a:name), 'v:val.kind==kind')
+  let l = filter(taglist('^'.a:name.'$'), 'v:val.kind==kind')
   if empty(l) | return -1 | endif
   let t = l[0]
 
@@ -182,37 +182,51 @@ fun! VHDL_portgeneric_get(name, kind)
 endfun
 
 
-" Put component ports
-" Expected to be used after typing 'port'
-" Search component name in the 5 previous lines
-fun! VHDL_comp_ports_put()
+" customlist completion function for entity names
+fun! s:VHDL_comp_entities(lead, cmd, pos)
+  let l = filter(taglist('^'.a:lead), 'v:val.kind=="e"')
+  return map(l, 'v:val.name')
+endfun
+
+" Insert code for a component.
+" Ask user for a component and get its ports using tags.
+" Expected to be used after typing 'component'
+fun! <SID>VHDL_component_create()
+
+  if getline('.') =~ 'end\s\+component' | return | endif
 
   let cursor_bak = getpos('.')
 
-  if !search('\<component\s\+\k\+','b', line('.')-5)
-    return
-  endif
-
-  let name = matchstr(getline('.'), '\<component\s\+\zs\k\+')
+  call inputsave()
+  let name = input('Component name: ', '', 'customlist,s:VHDL_comp_entities')
+  call inputrestore()
   if name == '' | return | endif
+
+  exe "norm \"=' '.name\<CR>p"
 
   let ports = VHDL_portgeneric_get(name, 'e')
   call setpos('.', cursor_bak)
-  if type(ports) != 3
-    "echomsg "Entity tag '".name."' not found."
-    return
-  elseif empty(ports)
-    return
+  pu='port ('
+
+  if type(ports) != 3 || empty(ports)
+    unlet ports
+    let ports = [');']
   endif
 
-  norm a (
   silent! pu=ports
-  exe '.-'.(len(ports)-1).',.call VHDL_nice_align()'
+  pu='end component;'
 
-  " Eat trailing char
+  let cursor_end = getpos('.')
+  exe cursor_bak[1].',.call VHDL_nice_align()'
+  call setpos('.', cursor_end)
+  norm o
+
   call getchar(0)
 
 endfun
+
+
+
 
 
 " Automatically create port and/or generic map
@@ -340,7 +354,8 @@ fun! VHDL_init()
   iabbrev <buffer> O: O : out 
 
   " port/map auto-fill
-  inoreabbrev <buffer> <silent> port port<C-o>:call VHDL_comp_ports_put()<CR>
+  "inoreabbrev <buffer> <silent> port port<C-o>:call VHDL_comp_ports_put()<CR>
+  inoreabbrev <buffer> <silent> component component<C-o>:call <SID>VHDL_component_create()<CR>
   inoreabbrev <buffer> <silent> map map<C-o>:call VHDL_map_put()<CR>
 
 	map <F2> :call VHDL_nice_align()<CR>
@@ -352,4 +367,38 @@ endfun
 
 " menu : word, abbr, menu, info, kind, icase, dup
 " tags : name, filename, cmd, kind, static
+
+
+"" Put component ports
+"" Expected to be used after typing 'port'
+"" Search component name in the 5 previous lines
+"fun! VHDL_comp_ports_put()
+"
+"  let cursor_bak = getpos('.')
+"
+"  if !search('\<component\s\+\k\+','b', line('.')-5)
+"    return
+"  endif
+"
+"  let name = matchstr(getline('.'), '\<component\s\+\zs\k\+')
+"  if name == '' | return | endif
+"
+"  let ports = VHDL_portgeneric_get(name, 'e')
+"  call setpos('.', cursor_bak)
+"  if type(ports) != 3
+"    "echomsg "Entity tag '".name."' not found."
+"    return
+"  elseif empty(ports)
+"    return
+"  endif
+"
+"  norm a (
+"  silent! pu=ports
+"  exe '.-'.(len(ports)-1).',.call VHDL_nice_align()'
+"
+"  " Eat trailing char
+"  call getchar(0)
+"
+"endfun
+
 
