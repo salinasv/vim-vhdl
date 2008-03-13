@@ -183,7 +183,7 @@ endfun
 
 
 " customlist completion function for entity names
-fun! s:VHDL_comp_entities(lead, cmd, pos)
+fun! VHDL_comp_entities(lead, cmd, pos)
   let l = filter(taglist('^'.a:lead), 'v:val.kind=="e"')
   return map(l, 'v:val.name')
 endfun
@@ -198,7 +198,7 @@ fun! <SID>VHDL_component_create()
   let cursor_bak = getpos('.')
 
   call inputsave()
-  let name = input('Component name: ', '', 'customlist,s:VHDL_comp_entities')
+  let name = input('Component name: ', '', 'customlist,VHDL_comp_entities')
   call inputrestore()
   if name == '' | return | endif
 
