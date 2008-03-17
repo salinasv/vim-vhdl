@@ -193,7 +193,8 @@ endfun
 " Expected to be used after typing 'component'
 fun! <SID>VHDL_component_create()
 
-  if getline('.') =~ 'end\s\+component' | return | endif
+  if getline('.') =~ '\%<'.col('.').'c--' | return | endif
+  if getline('.') =~ '\<end\s\+component' | return | endif
 
   let cursor_bak = getpos('.')
 
