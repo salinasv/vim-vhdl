@@ -204,18 +204,25 @@ fun! <SID>VHDL_component_create()
   if name == '' | return | endif
 
   exe "norm \"=' '.name\<CR>p"
+  "call setpos('.', cursor_bak)
+
+  let generics = VHDL_portgeneric_get(name, 'g')
+  pu='generic ('
+  if type(generics) != 3 || empty(generics)
+    unlet generics
+    let generics = [');']
+  endif
+  silent! pu=generics
 
   let ports = VHDL_portgeneric_get(name, 'e')
-  call setpos('.', cursor_bak)
   pu='port ('
-
   if type(ports) != 3 || empty(ports)
     unlet ports
     let ports = [');']
   endif
-
   silent! pu=ports
-  pu='end component;'
+
+  pu='end component '.name.';'
 
   let cursor_end = getpos('.')
   exe cursor_bak[1].',.call VHDL_nice_align()'
@@ -237,6 +244,7 @@ fun! VHDL_map_put()
 
   let cursor_bak = getpos('.')
   let do_generic = getline('.') !~ '\<port\>'
+  let do_port = getline('.') !~ '\<generic\>'
 
   if !search(':\s*\k\+','b', line('.')-5)
     return
@@ -260,7 +268,10 @@ fun! VHDL_map_put()
     call setpos('.', cursor_bak)
     if type(lines) == 3 && !empty(lines)
 
-      exe "norm ageneric ma\<Esc>ap ("
+      if do_port
+        exe "norm ageneric "
+      endif
+      exe "norm ma\<Esc>ap ("
 
       call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
       call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
@@ -281,47 +292,52 @@ fun! VHDL_map_put()
 
 
   " Port
-  let lines = VHDL_portgeneric_get(name, 'c')
-  call setpos('.', exists('cursor_bak2') ? cursor_bak2 : cursor_bak)
+  if do_port
 
-  if do_generic
-    " Trailing space is needed
-    exe "norm apor\<Esc>at "
-  endif
+    let lines = VHDL_portgeneric_get(name, 'c')
+    call setpos('.', exists('cursor_bak2') ? cursor_bak2 : cursor_bak)
 
-  if type(lines) != 3
-    "echomsg "Entity tag '".name."' not found."
-    if exists('end_move')
+    if do_generic
+      " Trailing space is needed
+      exe "norm apor\<Esc>at "
+    endif
+
+    if type(lines) != 3
+      "echomsg "Entity tag '".name."' not found."
+      if exists('end_move')
+        exe "norm ama\<Esc>ap ();"
+      else
+        exe "norm ama\<Esc>ap ("
+      endif
+
+    elseif empty(lines)
       exe "norm ama\<Esc>ap ();"
+      " Move cursor in brackets, if nothing has been added
+      if !exists('end_move')
+        call cursor('.',col('.')-2)
+      endif
+
     else
       exe "norm ama\<Esc>ap ("
+
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
+      if lines[-1] !~ '--'
+        let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ');', '') "XXX
+      endif
+      silent! pu=lines
+      exe '.-'.(len(lines)).',.call VHDL_nice_align()'
+      let end_move = 1
+
     endif
 
-  elseif empty(lines)
-    exe "norm ama\<Esc>ap ();"
-    " Move cursor in brackets, if nothing has been added
-    if !exists('end_move')
-      call cursor('.',col('.')-2)
-    endif
-
-  else
-    exe "norm ama\<Esc>ap ("
-
-    call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
-    call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
-    if lines[-1] !~ '--'
-      let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ');', '') "XXX
-    endif
-    silent! pu=lines
-    exe '.-'.(len(lines)).',.call VHDL_nice_align()'
-
-    let end_move = 1
   endif
 
-  " Go after first =>, if something has beend added
+  " Go after first =>, if something has been added
   if exists('end_move')
     call setpos('.', cursor_bak)
-    call search('=> ,', 'e')
+    " TODO if there are no ',' cursor is placed before the space
+    call search('=> ,\?', 'e')
   endif
 
   " Eat trailing char
