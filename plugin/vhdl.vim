@@ -52,6 +52,7 @@ fun! VHDL_nice_align() range
 
   " Reindent
   let equalprg_bak = &l:equalprg
+  setlocal equalprg=
   silent exe 'norm '.(a:lastline-a:firstline+1).'=='
   let &l:equalprg = equalprg_bak
 
@@ -273,16 +274,15 @@ fun! VHDL_map_put()
       endif
       exe "norm ma\<Esc>ap ("
 
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:.\\{-}\\ze\\(;\\| \\?--\\|$\\)","=> ", "")')
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "")')
       if lines[-1] !~ '--'
         let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ')', '') "XXX
       endif
       silent! pu=lines
       norm o
       let cursor_bak2 = getpos('.')
-
-      exe '.-'.(len(lines)).',.call VHDL_nice_align()'
+      "exe '.-'.(len(lines)).',.call VHDL_nice_align()'
       let end_move = 1
 
     endif
@@ -320,18 +320,20 @@ fun! VHDL_map_put()
     else
       exe "norm ama\<Esc>ap ("
 
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:[^;]*","=> ", "g")')
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "g")')
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:.\\{-}\\ze\\(;\\| \\?--\\|$\\)","=> ", "")')
+      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "")')
       if lines[-1] !~ '--'
         let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ');', '') "XXX
       endif
       silent! pu=lines
-      exe '.-'.(len(lines)).',.call VHDL_nice_align()'
+      "exe '.-'.(len(lines)).',.call VHDL_nice_align()'
       let end_move = 1
 
     endif
 
   endif
+
+  exe cursor_bak[1].',.call VHDL_nice_align()'
 
   " Go after first =>, if something has been added
   if exists('end_move')
