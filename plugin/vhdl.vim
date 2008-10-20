@@ -272,7 +272,7 @@ fun! VHDL_map_put()
       if do_port
         exe "norm ageneric "
       endif
-      exe "norm ma\<Esc>ap ("
+      exe "norm am\<Esc>aap ("
 
       call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:.\\{-}\\ze\\(;\\| \\?--\\|$\\)","=> ", "")')
       call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "")')
