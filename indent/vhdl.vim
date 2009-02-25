@@ -9,7 +9,7 @@
 if exists("b:did_indent")
   finish
 endif
-let b:did_indent = 1
+let b:did_indent = 2
 
 " setup indent options for local VHDL buffer
 setlocal indentexpr=GetVHDLindent()
@@ -95,7 +95,7 @@ function GetVHDLindent()
 
   " ****************************************************************************************
   " indent:   align generic variables & port names
-  " keywords: "generic", "map", "port" + "(", provided current line is part of mapping
+  " keywords: "generic", "map", "port", "procedure", "function" + "(", provided current line is part of mapping
   " where:    anywhere in previous 2 lines
   " find following previous non-comment line
   let pn = prevnonblank(prevn - 1)
@@ -104,7 +104,7 @@ function GetVHDLindent()
     let pn = prevnonblank(pn - 1)
     let ps = getline(pn)
   endwhile
-  if (curs =~ '^\s*)' || curs =~? '^\s*\%(\<\%(generic\|map\|port\)\>.*\)\@<!\S\+\s*\%(=>\s*\S\+\|:[^=]\@=\s*\%(\%(in\|out\|inout\|buffer\|linkage\)\>\|\w\+\s\+:=\)\)') && (prevs =~? s:NC.'\<\%(generic\|map\|port\)\s*(\%(\s*\w\)\=' || (ps =~? s:NC.'\<\%(generic\|map\|port\)'.s:ES && prevs =~ '^\s*('))
+  if (curs =~ '^\s*)' || curs =~? '^\s*\%(\<\%(generic\|map\|port\|\%(procedure\|function\)\s\+\w\+\)\>.*\)\@<!\%(\%(signal\|constant\|variable\)\s\+\)\=\S\+\s*\%(=>\s*\S\+\|:[^=]\@=\s*\%(\%(in\|out\|inout\|buffer\|linkage\)\>\|\w\+\s\+:=\)\)') && (prevs =~? s:NC.'\<\%(generic\|map\|port\|\%(procedure\|function\)\s\+\w\+\)\s*(\%(\s*\w\)\=' || (ps =~? s:NC.'\<\%(generic\|map\|port\|procedure\|function\)'.s:ES && prevs =~ '^\s*('))
     " align closing ")" with opening "("
     if curs =~ '^\s*)'
       return ind2 + stridx(prevs_noi, '(')
@@ -124,9 +124,9 @@ function GetVHDLindent()
   " indent:   align conditional/select statement
   " keywords: variable + "<=" without ";" ending
   " where:    start of previous line
-  if prevs =~? '^\s*\S\+\s*<=[^;]*'.s:ES
+  if prevs =~? '^\s*\S\+\s*[:<]=[^;]*'.s:ES
     if g:vhdl_indent_rhsassign
-      return ind2 + matchend(prevs_noi, '<=\s*\ze.')
+      return ind2 + matchend(prevs_noi, '[:<]=\s*\ze.')
     else
       return ind2 + &sw
     endif
@@ -147,7 +147,7 @@ function GetVHDLindent()
     let m = 3
   elseif prevs =~ '^\s*)'
     let m = 1
-  elseif prevs =~ s:NC.'\%(<=.*\)\@<!;'.s:ES || (curs !~ '^\s*)' && prevs =~ s:NC.'=>.*'.s:NC.')'.s:ES)
+  elseif prevs =~ s:NC.'\%([<:]=.*\)\@<!;'.s:ES || (curs !~ '^\s*)' && prevs =~ s:NC.'=>.*'.s:NC.')'.s:ES)
     let m = 2
   endif
 
@@ -160,12 +160,12 @@ function GetVHDLindent()
         " make sure one of these is true
         " keywords: variable + "<=" without ";" ending
         " where:    start of previous non-comment line
-        " keywords: "generic", "map", "port"
+        " keywords: "generic", "map", "port", "procedure", "function"
         " where:    anywhere in previous non-comment line
         " keyword:  "("
         " where:    start of previous non-comment line
-        if m < 3 && ps !~? '^\s*\S\+\s*<=[^;]*'.s:ES
-          if ps =~? s:NC.'\<\%(generic\|map\|port\)\>' || ps =~ '^\s*('
+        if m < 3 && ps !~? '^\s*\S\+\s*[<:]=[^;]*'.s:ES
+          if ps =~? s:NC.'\<\%(generic\|map\|port\|procedure\|function\)\>' || ps =~ '^\s*('
             let ind = t
           endif
           break
@@ -238,6 +238,13 @@ function GetVHDLindent()
     return 0
   endif
 
+  " indent:   0
+  " keywords: "end" + "architecture", "configuration", "entity", "package"
+  " where:    start of current line
+  if curs =~? '^\s*end\s\+\%(architecture\|configuration\|entity\|package\)\>'
+    return 0
+  endif
+
   " indent:   maintain indent of previous opening statement
   " keyword:  "is"
   " where:    start of current line
@@ -297,7 +304,7 @@ function GetVHDLindent()
   " keyword:  "generate", "is", "then", "=>"
   " where:    end of previous line
   " _note_:   indent allowed to leave this filter
-  if prevs =~? s:NC.'\%(\<begin\>\|'.s:NE.'\<\%(loop\|record\|units\)\>\)' || prevs =~? '^\s*\%(component\|else\|for\)\>' || prevs =~? s:NC.'\%('.s:NE.'\<generate\|\<\%(is\|then\)\|=>\)'.s:ES
+  if prevs !~ ';'.s:NE && (prevs =~? s:NC.'\%(\<begin\>\|'.s:NE.'\<\%(loop\|record\|units\)\>\)' || prevs =~? '^\s*\%(component\|else\|for\)\>' || prevs =~? s:NC.'\%('.s:NE.'\<generate\|\<\%(is\|then\)\|=>\)'.s:ES)
     let ind = ind + &sw
   endif
 
@@ -378,13 +385,6 @@ function GetVHDLindent()
     return ind - &sw
   endif
 
-  " indent:   0
-  " keywords: "end" + "architecture", "configuration", "entity", "package"
-  " where:    start of current line
-  if curs =~? '^\s*end\s\+\%(architecture\|configuration\|entity\|package\)\>'
-    return 0
-  endif
-
   " indent:   -sw
   " keywords: "end" + identifier
   " where:    start of current line
@@ -395,9 +395,9 @@ function GetVHDLindent()
 
   " ****************************************************************************************
   " indent:   maintain indent of previous opening statement
-  " keywords: without "generic", "map", "port" + ":" but not ":=" + "in", "out", "inout", "buffer", "linkage", variable & ":="
+  " keywords: without "generic", "map", "port", "procedure", "function" + ":" but not ":=" + "in", "out", "inout", "buffer", "linkage", variable & ":="
   " where:    start of current line
-  if curs =~? '^\s*\%(\<\%(generic\|map\|port\)\>.*\)\@<!\S\+\s*:[^=]\@=\s*\%(\%(in\|out\|inout\|buffer\|linkage\)\>\|\w\+\s\+:=\)'
+  if curs =~? '^\s*\%(\<\%(generic\|map\|port\|procedure\|function\)\>.*\)\@<!\%(\%(signal\|constant\|variable\)\s\+\)\=\S\+\s*:[^=]\@=\s*\%(\%(in\|out\|inout\|buffer\|linkage\)\>\|\w\+\s\+:=\)'
     return ind2
   endif
 

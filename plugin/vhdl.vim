@@ -7,26 +7,28 @@
 "  - some features need tags, keep them up to date
 "
 " Features:
-"  - omni-completion of entities names after 'component' keyword
 "  - easy component creation (insert entity ports)
 "    after typing 'component', throws a name prompt (entities names
 "    completion), then build basic component code
-"  - put entity generic port map and/or component port map
-"    to add only ports type:
-"       labelname : compname port map
-"    to add both generic (if any) and port maps type:
-"       labelname : compname map
+"  - insert maps for component instanciation:
+"       sample use:  type 'map' after instanciated component name
 "  - reindent and do some realignments
 "       sample use:  %call VHDL_nice_align()
+"
+" Todo:
+"  - fix buggy indent behaviour
 
 
-if exists('g:vhdl_plugin')
-  finish
+"For tests/debug purposes
+if !exists('g:vhdl_plugin_debug')
+  if exists('g:vhdl_plugin')
+    finish
+  endif
 endif
-let g:vhdl_plugin=1
 
 
-" Right align delimiter, surround it with spaces
+
+""" Right align delimiter, surround it with spaces
 " Cursor is moved at the end of the given range
 fun! VHDL_align(delim) range
 
@@ -47,7 +49,7 @@ fun! VHDL_align(delim) range
 endfun
 
 
-" Reindent and do some realignements
+""" Reindent and do some realignements
 fun! VHDL_nice_align() range
 
   " Reindent
@@ -56,29 +58,19 @@ fun! VHDL_nice_align() range
   silent exe 'norm '.(a:lastline-a:firstline+1).'=='
   let &l:equalprg = equalprg_bak
 
-  " Signal declarations, :
+  " declarations: ':'
   call cursor(a:firstline,0)
-  while search('^\s*signal\>', 'cW', a:lastline)
-    let l1 = line(".")
-    if search('^\c\(\s*signal\>\)\@!', 'W', a:lastline)
+  while search('^\s*\%(\%(signal\|variable\|constant\)\+\)\?\w\+\s*:', 'cW', a:lastline)
+    let l1 = line('.')
+    if search('^\%(\s*\%(\%(signal\|variable\|constant\)\+\)\?\w\+\s*:\)\@!', 'W', a:lastline)
       exe l1.','.line(".").'call VHDL_align(":")'
     endif
     call cursor(line('.')+1,0)
   endwhile
 
-  " port ( ... ), :
+  " map: '=>'
   call cursor(a:firstline,0)
-  while search('\<port\>\_s*(', 'ceW', a:lastline)
-    let l1 = line(".")
-    if searchpair('(','',')', 'W', '', a:lastline)
-      exe l1.','.line('.').'call VHDL_align(":")'
-    endif
-    call cursor(line('.')+1,0)
-  endwhile
-
-  " port map ( ... ), =>
-  call cursor(a:firstline,0)
-  while search('\<port\_s\+map\>\_s*(', 'ceW', a:lastline)
+  while search('\<\%(port\|generic\)\_s\+map\>\_s*(', 'ceW', a:lastline)
     let l1 = line(".")
     if searchpair('(','',')', 'W', '', a:lastline)
       exe l1.','.line('.').'call VHDL_align("=>")'
@@ -90,65 +82,29 @@ endfun
 
 
 
-" Omni-completion
-fun! VHDL_omnicomp(findstart, base)
-
-  "TODO vérifier qu'on utilise les tags
-
-  if a:findstart
-    unlet! b:vhdl_menu
-
-    " locate the start of the word
-    let line = getline('.')
-    let start = col('.') - 1
-    let compl_begin = col('.') - 2
-    while start >= 0 && line[start - 1] =~ '[a-zA-Z_0-9]'
-      let start -= 1
-    endwhile
-    let b:compl_context = getline('.')[0:start-1]
-    return start
-  endif
-
-  if exists('b:vhdl_menu')
-    return b:vhdl_menu
-  endif
-
-  "TODO revoir ça...
-  if exists("b:compl_context")
-    let context = b:compl_context
-    unlet! b:compl_context
-  endif
-
-  " component
-  if context =~ '\<component\>'
-
-    let b:vhdl_menu = []
-    for v in filter(taglist('^'.a:base), 'v:val.kind=="e"')
-      call add(b:vhdl_menu, v.name)
-    endfor
-    return b:vhdl_menu
-
-  endif
-
-endfun
-
-
-
-" Get port/generic of a given entity or component
-" a:kind is a kind of tag : e, c, g (generic in entity)
+""" Get generic/port of a given entity or component
+"
+" Returns a dictionary of list of lines. Keys are flag letter associated to
+" the result. The whole declaration is returned, including lines with the
+" generic/port keywords.
+"
+" flags is a String, which can contain these character flags:
+"  'e'  search for an entity (default)
+"  'c'  search for a component
+"  'g'  return generic
+"  'p'  return port
+"
 " Return -1 if no tag is not found
-fun! VHDL_portgeneric_get(name, kind)
+fun! VHDL_get_genericport(name, flags)
 
-  let type = a:kind == 'g' ? 'generic' : 'port'
-  let kind = a:kind == 'g' ? 'e' : a:kind
-  
+  let kind = a:flags =~ 'c' ? 'c' : 'e'
+  "TODO search for current file component first
   let l = filter(taglist('^'.a:name.'$'), 'v:val.kind==kind')
   if empty(l) | return -1 | endif
   let t = l[0]
 
   let view_bak = winsaveview()
-
-  " Already in the buffer, don't change
+  " Change buffer if tag points to another one
   if bufnr(t.filename) != bufnr("%")
     let bufhidden_bak = &bufhidden
     set bufhidden=hide
@@ -158,20 +114,22 @@ fun! VHDL_portgeneric_get(name, kind)
 
   sandbox silent! exe t.cmd
   
-  let lines = []
-  if search(type.'\_s*(', 'eW')
-    let l1 = line('.')+1
+  let lines = {}
+  let end_n = search('^\s*end\>', 'nW')
+  let start_pos = getpos('.')
 
-    "if getline('.') =~ type.'\s*(\s*\S'
-    if getline('.') =~ '(\s*\S'
-      let lines = [ getline('.')[col('.'):] ]
+  for [k,v] in items({'g':'generic','p':'port'})
+    if a:flags =~ k && search('\<'.v.'\_s*(', 'eW', end_n)
+      let n1 = line('.')
+      let n2 = searchpair('(','',')', 'nW', '', end_n)
+      if n2 > 0
+        let lines[k] = getline(n1,n2)
+      endif
+      call setpos('.', start_pos)
     endif
-    if searchpair('(','',')', 'W')
-      let lines += getline(l1, line('.'))
-    endif
-  endif
+  endfor
 
-  " Reload previous buffer
+  " Reload previous buffer, if needed
   if exists('buf_bak')
     exe 'keepalt b '.buf_bak
     exe 'set bufhidden='.bufhidden_bak
@@ -183,13 +141,91 @@ fun! VHDL_portgeneric_get(name, kind)
 endfun
 
 
-" customlist completion function for entity names
+""" customlist completion function for entity names
 fun! VHDL_comp_entities(lead, cmd, pos)
   let l = filter(taglist('^'.a:lead), 'v:val.kind=="e"')
   return map(l, 'v:val.name')
 endfun
 
-" Insert code for a component.
+
+
+""" Put the generic/port map of a given component
+" If component name is ommited, it is searched for in the 5 previous lines.
+" (starting from cursor position).
+" Return the number of put lines (may be 0), -1 if there was no map to put.
+fun! VHDL_put_map(...) abort
+
+  let cursor_bak = getpos('.')
+
+  if exists('a:1')
+    let name = a:1
+  else
+    if !search(':\s*\k\+','b', line('.')-5)
+      return -1
+    endif
+    let name = matchstr(getline('.'), ':\s*\zs\k\+')
+    call setpos('.', cursor_bak)
+  endif
+
+  if name == ''
+    echomsg "Component name not found"
+    return -1
+  endif
+
+  let complines = VHDL_get_genericport(name, 'cgp')
+  if type(complines) == type(0) || empty(complines)
+    " No result
+    call setpos('.', cursor_bak)
+    if type(complines) == type(0)
+      echomsg "Component '".name."' not found"
+    else
+      echomsg "No map for component '".name."'"
+    endif
+    return -1
+  endif
+
+  " Extract signals declared in generic/port
+  let lines = {}
+  for [k,v] in items(complines)
+    let type = {'g':'generic','p':'port'}[k]
+    " Strip comments before joining
+    call map(v, 'substitute(v:val, "\\s*--.*$", "", "")')
+    let smap = join(v, "\n")
+    " Remove port/generic, object type and declaration type
+    let smap = substitute(smap, '\<'.type.'\s*(', '', '')
+    let smap = substitute(smap, '\<\%(signal\|variable\|constant\)\>', '', 'g')
+    let smap = substitute(smap, ':[^;]*', '', 'g')
+    " Extract declared objects and build mapping
+    let dec = split(smap, '[[:space:],;]\+')
+    let dec = map(dec, 'v:val." => ,"')
+    " Remove final ',' of last declaration
+    let dec[-1] = substitute(dec[-1], ',$', '', '')
+    " Add first and last lines, but not the final ';'
+    let lines[k] = [type.' map ('] + dec + [')']
+  endfor
+
+  " Put first generic, then port (if available)
+  let ks = keys(lines)
+  if len(ks) == 2
+    let putlines = lines['g'] + lines['p']
+  elseif len(ks) == 1
+    let putlines = lines[ks[0]]
+  else
+    echomsg "Nothing to put for component '".name."'"
+    return 0
+  endif
+  " Add the final ';', and put
+  let putlines[-1] .= ';'
+  put=putlines
+
+  exe cursor_bak[1].',.call VHDL_nice_align()'
+  "call setpos('.', cursor_bak)
+  return len(putlines)
+
+endfun
+
+
+""" Insert code for a component.
 " Ask user for a component and get its ports using tags.
 " Expected to be used after typing 'component'
 fun! <SID>VHDL_component_create()
@@ -205,150 +241,47 @@ fun! <SID>VHDL_component_create()
   if name == '' | return | endif
 
   exe "norm \"=' '.name\<CR>p"
-  "call setpos('.', cursor_bak)
 
-  let generics = VHDL_portgeneric_get(name, 'g')
-  pu='generic ('
-  if type(generics) != 3 || empty(generics)
-    unlet generics
-    let generics = [');']
+  let gp = VHDL_get_genericport(name, 'egp')
+  if has_key(gp, 'g')
+    silent! pu=gp['g']
   endif
-  silent! pu=generics
-
-  let ports = VHDL_portgeneric_get(name, 'e')
-  pu='port ('
-  if type(ports) != 3 || empty(ports)
-    unlet ports
-    let ports = [');']
+  if has_key(gp, 'p')
+    silent! pu=gp['p']
   endif
-  silent! pu=ports
 
-  pu='end component '.name.';'
+  silent! pu='end component '.name.';'
 
   let cursor_end = getpos('.')
   exe cursor_bak[1].',.call VHDL_nice_align()'
   call setpos('.', cursor_end)
   norm o
 
-  call getchar(0)
-
 endfun
 
 
+""" Insert generic/port map code for component instantiation.
+" Wraps the VHDL_put_map() function for iabbrev use.
+fun! <SID>VHDL_component_instantiate()
 
-
-
-" Automatically create port and/or generic map
-" Expected to be used after typing 'map'
-" Search component name in the 5 previous lines
-fun! VHDL_map_put()
-
-  let cursor_bak = getpos('.')
-  let do_generic = getline('.') !~ '\<port\>'
-  let do_port = getline('.') !~ '\<generic\>'
-
-  if !search(':\s*\k\+','b', line('.')-5)
-    return
+  if getline('.') =~ '\%<'.col('.').'c--' | return | endif
+  let pos_bak = getpos('.')
+  if getline('.') =~ '^\s*$'
+    norm k$
   endif
 
-  let name = matchstr(getline('.'), ':\s*\zs\k\+')
-  if name == '' 
-    call setpos('.', cursor_bak)
-    return
-  endif
-
-  call setpos('.', cursor_bak)
-
-  " Remove the "map"
-  norm 2"_X"_x
-
-  " Generic
-  if do_generic
-
-    let lines = VHDL_portgeneric_get(name, 'g')
-    call setpos('.', cursor_bak)
-    if type(lines) == 3 && !empty(lines)
-
-      if do_port
-        exe "norm ageneric "
-      endif
-      exe "norm am\<Esc>aap ("
-
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:.\\{-}\\ze\\(;\\| \\?--\\|$\\)","=> ", "")')
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "")')
-      if lines[-1] !~ '--'
-        let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ')', '') "XXX
-      endif
-      silent! pu=lines
-      norm o
-      let cursor_bak2 = getpos('.')
-      "exe '.-'.(len(lines)).',.call VHDL_nice_align()'
-      let end_move = 1
-
-    endif
-    unlet lines
-
-  endif
-
-
-  " Port
-  if do_port
-
-    let lines = VHDL_portgeneric_get(name, 'c')
-    call setpos('.', exists('cursor_bak2') ? cursor_bak2 : cursor_bak)
-
-    if do_generic
-      " Trailing space is needed
-      exe "norm apor\<Esc>at "
-    endif
-
-    if type(lines) != 3
-      "echomsg "Entity tag '".name."' not found."
-      if exists('end_move')
-        exe "norm ama\<Esc>ap ();"
-      else
-        exe "norm ama\<Esc>ap ("
-      endif
-
-    elseif empty(lines)
-      exe "norm ama\<Esc>ap ();"
-      " Move cursor in brackets, if nothing has been added
-      if !exists('end_move')
-        call cursor('.',col('.')-2)
-      endif
-
-    else
-      exe "norm ama\<Esc>ap ("
-
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!:.\\{-}\\ze\\(;\\| \\?--\\|$\\)","=> ", "")')
-      call map(lines, 'substitute(v:val, "\\(--.*\\)\\@<!=> ;","=> ,", "")')
-      if lines[-1] !~ '--'
-        let lines[-1] = substitute(lines[-1], '\(,\|);\)$', ');', '') "XXX
-      endif
-      silent! pu=lines
-      "exe '.-'.(len(lines)).',.call VHDL_nice_align()'
-      let end_move = 1
-
-    endif
-
-  endif
-
-  exe cursor_bak[1].',.call VHDL_nice_align()'
-
-  " Go after first =>, if something has been added
-  if exists('end_move')
-    call setpos('.', cursor_bak)
-    " TODO if there are no ',' cursor is placed before the space
+  if VHDL_put_map() > 0
+    call setpos('.', getpos("'["))
     call search('=> ,\?', 'e')
+    call getchar(0)
+  else
+    call setpos('.', pos_bak)
+    exe "norm \"='map'\<CR>p"
   endif
 
-  " Eat trailing char
-  call getchar(0)
-
-endfun
+endfunc
 
 
-"XXX
 fun! VHDL_init()
 
   setlocal ignorecase
@@ -356,9 +289,6 @@ fun! VHDL_init()
 
 
   " Simple shortcuts
-  "XXX use abbrev too ?
-  imap <buffer> ,, <= 
-  imap <buffer> .. => 
   iabbrev <buffer> dt downto
   iabbrev <buffer> sig signal
   iabbrev <buffer> gen generate
@@ -369,55 +299,12 @@ fun! VHDL_init()
   iabbrev <buffer> toi to_integer
   iabbrev <buffer> tos to_unsigned
   iabbrev <buffer> tou to_unsigned
-  iabbrev <buffer> I: I : in 
-  iabbrev <buffer> O: O : out 
 
-  " port/map auto-fill
-  "inoreabbrev <buffer> <silent> port port<C-o>:call VHDL_comp_ports_put()<CR>
   inoreabbrev <buffer> <silent> component component<C-o>:call <SID>VHDL_component_create()<CR>
-  inoreabbrev <buffer> <silent> map map<C-o>:call VHDL_map_put()<CR>
+  inoreabbrev <buffer> <silent> map <C-o>:call <SID>VHDL_component_instantiate()<CR>
 
 	map <F2> :call VHDL_nice_align()<CR>
-	map <F11> :cp<CR>
-	map <F12> :cn<CR>
 
 endfun
-
-
-" menu : word, abbr, menu, info, kind, icase, dup
-" tags : name, filename, cmd, kind, static
-
-
-"" Put component ports
-"" Expected to be used after typing 'port'
-"" Search component name in the 5 previous lines
-"fun! VHDL_comp_ports_put()
-"
-"  let cursor_bak = getpos('.')
-"
-"  if !search('\<component\s\+\k\+','b', line('.')-5)
-"    return
-"  endif
-"
-"  let name = matchstr(getline('.'), '\<component\s\+\zs\k\+')
-"  if name == '' | return | endif
-"
-"  let ports = VHDL_portgeneric_get(name, 'e')
-"  call setpos('.', cursor_bak)
-"  if type(ports) != 3
-"    "echomsg "Entity tag '".name."' not found."
-"    return
-"  elseif empty(ports)
-"    return
-"  endif
-"
-"  norm a (
-"  silent! pu=ports
-"  exe '.-'.(len(ports)-1).',.call VHDL_nice_align()'
-"
-"  " Eat trailing char
-"  call getchar(0)
-"
-"endfun
 
 

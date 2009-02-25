@@ -1,0 +1,11 @@
+
+Vim-VHDL, a VHDL plugin for Vim
+
+Project homepage: http://code.google.com/p/vim-vhdl/
+
+Content:
+ - plugin/vhdl.vim : VHDL plugin
+ - plugin/vstpl.vim : very simple template plugin
+ - indent/vhdl.vim : default VHDL indent file with some bugs fixed.
+ - ctags.conf : ctags config file
+
