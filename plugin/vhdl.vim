@@ -191,13 +191,17 @@ fun! VHDL_put_map(...) abort
     " Strip comments before joining
     call map(v, 'substitute(v:val, "\\s*--.*$", "", "")')
     let smap = join(v, "\n")
-    " Remove port/generic, object type and declaration type
+    " Remove port/generic trailing ')', object type and declaration type
     let smap = substitute(smap, '\<'.type.'\s*(', '', '')
+    let smap = substitute(smap, ')[;]\s*$', '', '')
     let smap = substitute(smap, '\<\%(signal\|variable\|constant\)\>', '', 'g')
     let smap = substitute(smap, ':[^;]*', '', 'g')
     " Extract declared objects and build mapping
     let dec = split(smap, '[[:space:],;]\+')
     let dec = map(dec, 'v:val." => ,"')
+    if len(dec) == 0
+      continue
+    end
     " Remove final ',' of last declaration
     let dec[-1] = substitute(dec[-1], ',$', '', '')
     " Add first and last lines, but not the final ';'
